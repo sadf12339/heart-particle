@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Love is in the Air - 3D Heart Animation</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #000;
+            font-family: 'Arial', sans-serif;
+        }
+        canvas {
+            display: block;
+        }
+        /* 文字样式 */
+        #love-text {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 3rem;
+            color: #ff3366;
+            text-shadow: 0 0 10px rgba(255, 51, 102, 0.8), 0 0 20px rgba(255, 51, 102, 0.5);
+            pointer-events: none;
+            opacity: 0.8;
+            z-index: 1;
+            font-weight: bold;
+            letter-spacing: 2px;
+            animation: textPulse 3s ease-in-out infinite;
+        }
+        
+        /* 文字脉冲动画 */
+        @keyframes textPulse {
+            0% {
+                transform: translate(-50%, -50%) scale(1);
+                opacity: 0.7;
+            }
+            50% {
+                transform: translate(-50%, -50%) scale(1.05);
+                opacity: 0.9;
+            }
+            100% {
+                transform: translate(-50%, -50%) scale(1);
+                opacity: 0.7;
+            }
+        }
+        
+        /* 响应式文字大小 */
+        @media (max-width: 768px) {
+            #love-text {
+                font-size: 2rem;
+                letter-spacing: 1px;
+            }
+        }
+    </style>
+    <!-- 引入Three.js库 -->
+    <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+    <!-- 引入OrbitControls用于相机控制 -->
+    <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/examples/js/controls/OrbitControls.js"></script>
+</head>
+<body>
+        <!-- 浪漫文字 -->
+        <div id="love-text">gift for the loveliest girl</div>
+    <script>
+        // 初始化Three.js场景
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        
+        // 渲染器 - 优化性能和视觉效果
+        const renderer = new THREE.WebGLRenderer({ 
+            antialias: true,
+            alpha: true
+        });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(window.devicePixelRatio);
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        document.body.appendChild(renderer.domElement);
+        
+        // 窗口大小调整处理
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+        
+        // 创建蓝色粒子构成的爱心形状
+        let blueHeartParticles = [];
+        let blueHeartSystem;
+        const blueHeartParticleCount = 1500; // 蓝色粒子数量
+        
+        function createBlueHeartParticles() {
+            const geometry = new THREE.BufferGeometry();
+            const positions = new Float32Array(blueHeartParticleCount * 3);
+            const colors = new Float32Array(blueHeartParticleCount * 3);
+            
+            // 生成爱心表面的蓝色粒子
+            let particleIndex = 0;
+            const detail = 40;
+            
+            for (let u = 0; u <= detail; u++) {
+                for (let v = 0; v <= detail; v++) {
+                    if (particleIndex < blueHeartParticleCount) {
+                        const theta = (u / detail) * Math.PI * 2;
+                        const phi = (v / detail) * Math.PI * 2;
+                        
+                        // 爱心曲面方程 (参数方程) - 缩小尺寸
+                        const x = 16 * Math.pow(Math.sin(phi), 3);
+                        const y = 13 * Math.cos(phi) - 5 * Math.cos(2 * phi) - 2 * Math.cos(3 * phi) - Math.cos(4 * phi);
+                        const z = 16 * Math.pow(Math.sin(theta), 3);
+                        
+                        // 缩小爱心尺寸到原来的约1/3
+                        const scale = 0.06;
+                        positions[particleIndex * 3] = x * scale;
+                        positions[particleIndex * 3 + 1] = y * scale;
+                        positions[particleIndex * 3 + 2] = z * scale;
+                        
+                        // 蓝色渐变 - 从深蓝色到浅蓝色
+                        const blueHue = 0.6 + (Math.sin(phi) + 1) * 0.1; // 0.6-0.8之间的蓝色调
+                        const saturation = 0.8 + Math.random() * 0.2;
+                        const lightness = 0.4 + Math.random() * 0.3;
+                        
+                        const rgb = hslToRgb(blueHue, saturation, lightness);
+                        colors[particleIndex * 3] = rgb.r;
+                        colors[particleIndex * 3 + 1] = rgb.g;
+                        colors[particleIndex * 3 + 2] = rgb.b;
+                        
+                        // 保存粒子信息
+                        blueHeartParticles.push({
+                            position: new THREE.Vector3(x * scale, y * scale, z * scale),
+                            velocity: new THREE.Vector3(0, 0, 0),
+                            color: new THREE.Color(rgb.r, rgb.g, rgb.b),
+                            size: 0.03 + Math.random() * 0.04,
+                            originalPosition: new THREE.Vector3(x * scale, y * scale, z * scale) // 保存原始位置用于波动
+                        });
+                        
+                        particleIndex++;
+                    }
+                }
+            }
+            
+            // 处理剩余的粒子位置
+            while (particleIndex < blueHeartParticleCount) {
+                // 在爱心内部随机填充一些粒子，增加立体感
+                const angle1 = Math.random() * Math.PI * 2;
+                const angle2 = Math.random() * Math.PI * 2;
+                const radius = Math.random() * 0.8;
+                
+                const x = 16 * Math.pow(Math.sin(angle2), 3) * radius * 0.06;
+                const y = (13 * Math.cos(angle2) - 5 * Math.cos(2 * angle2) - 2 * Math.cos(3 * angle2) - Math.cos(4 * angle2)) * radius * 0.06;
+                const z = 16 * Math.pow(Math.sin(angle1), 3) * radius * 0.06;
+                
+                positions[particleIndex * 3] = x;
+                positions[particleIndex * 3 + 1] = y;
+                positions[particleIndex * 3 + 2] = z;
+                
+                const rgb = hslToRgb(0.7, 0.9, 0.5);
+                colors[particleIndex * 3] = rgb.r;
+                colors[particleIndex * 3 + 1] = rgb.g;
+                colors[particleIndex * 3 + 2] = rgb.b;
+                
+                blueHeartParticles.push({
+                    position: new THREE.Vector3(x, y, z),
+                    velocity: new THREE.Vector3(0, 0, 0),
+                    color: new THREE.Color(rgb.r, rgb.g, rgb.b),
+                    size: 0.02 + Math.random() * 0.03,
+                    originalPosition: new THREE.Vector3(x, y, z)
+                });
+                
+                particleIndex++;
+            }
+            
+            // 设置几何体属性
+            geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+            geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+            
+            // 创建蓝色粒子材质 - 发光效果
+            const material = new THREE.PointsMaterial({
+                size: 0.05,
+                vertexColors: true,
+                transparent: true,
+                opacity: 0.9,
+                sizeAttenuation: true,
+                blending: THREE.AdditiveBlending,
+                depthWrite: false // 提高性能，适合发光粒子
+            });
+            
+            // 创建蓝色爱心粒子系统
+            blueHeartSystem = new THREE.Points(geometry, material);
+            scene.add(blueHeartSystem);
+        }
+        
+        // 创建蓝色爱心粒子系统
+        createBlueHeartParticles();
+        
+        // 虚拟爱心对象，用于计算引力和位置
+        const heart = {
+            position: new THREE.Vector3(0, 0, 0),
+            scale: new THREE.Vector3(1, 1, 1)
+        };
+        
+        // 添加光源 - 优化光照效果
+        const ambientLight = new THREE.AmbientLight(0x202040, 2); // 更蓝的环境光，增强浪漫氛围
+        scene.add(ambientLight);
+        
+        const pointLight = new THREE.PointLight(0xff6699, 3, 100); // 增强主光源强度
+        pointLight.position.set(5, 5, 5);
+        pointLight.castShadow = true;
+        scene.add(pointLight);
+        
+        const pointLight2 = new THREE.PointLight(0x6699ff, 1.5, 100); // 增强辅助光源
+        pointLight2.position.set(-5, -5, -5);
+        scene.add(pointLight2);
+        
+        // 添加平行光，增强立体感
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 0.5);
+        directionalLight.position.set(0, 1, 1);
+        directionalLight.castShadow = true;
+        scene.add(directionalLight);
+        
+        // 相机位置
+        camera.position.z = 5;
+        
+        // 相机旋转相关变量
+        let cameraRotationTime = 0;
+        const cameraRadius = 5; // 相机围绕中心旋转的半径
+        
+        // 粒子系统变量
+        const particleCount = 500;
+        const particles = [];
+        let particleSystem;
+        
+        // 创建彩色粒子系统
+        function createParticleSystem() {
+            const geometry = new THREE.BufferGeometry();
+            const positions = new Float32Array(particleCount * 3);
+            const colors = new Float32Array(particleCount * 3);
+            
+            // 为每个粒子分配随机位置和颜色
+            for (let i = 0; i < particleCount; i++) {
+                const i3 = i * 3;
+                
+                // 生成心形轨道周围的随机位置
+                const angle = Math.random() * Math.PI * 2;
+                const radius = 1.5 + Math.random() * 1.5; // 1.5-3.0范围内的半径
+                const height = (Math.random() - 0.5) * 3; // -1.5到1.5的高度
+                
+                // 基于极坐标的位置
+                positions[i3] = Math.cos(angle) * radius;
+                positions[i3 + 1] = height;
+                positions[i3 + 2] = Math.sin(angle) * radius;
+                
+                // 随机彩色
+                const hue = Math.random(); // 0-1的色相值
+                const saturation = 0.7 + Math.random() * 0.3; // 0.7-1.0的饱和度
+                const lightness = 0.5 + Math.random() * 0.5; // 0.5-1.0的亮度
+                
+                // HSL到RGB转换
+                const rgb = hslToRgb(hue, saturation, lightness);
+                colors[i3] = rgb.r;
+                colors[i3 + 1] = rgb.g;
+                colors[i3 + 2] = rgb.b;
+                
+                // 保存粒子信息（位置、速度等）
+                particles.push({
+                    position: new THREE.Vector3(positions[i3], positions[i3 + 1], positions[i3 + 2]),
+                    velocity: new THREE.Vector3(
+                        (Math.random() - 0.5) * 0.02,
+                        (Math.random() - 0.5) * 0.02,
+                        (Math.random() - 0.5) * 0.02
+                    ),
+                    color: new THREE.Color(rgb.r, rgb.g, rgb.b),
+                    size: 0.05 + Math.random() * 0.1
+                });
+            }
+            
+            // 设置几何体属性
+            geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+            geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+            
+            // 创建粒子材质 - 添加发光效果
+            const material = new THREE.PointsMaterial({
+                size: 0.07,
+                vertexColors: true,
+                transparent: true,
+                opacity: 0.9,
+                sizeAttenuation: true,
+                // 添加发光效果的相关属性
+                blending: THREE.AdditiveBlending
+            });
+            
+            // 创建粒子系统
+            particleSystem = new THREE.Points(geometry, material);
+            scene.add(particleSystem);
+        }
+        
+        // HSL到RGB转换函数
+        function hslToRgb(h, s, l) {
+            let r, g, b;
+            
+            if (s === 0) {
+                r = g = b = l; // 灰度
+            } else {
+                const hue2rgb = (p, q, t) => {
+                    if (t < 0) t += 1;
+                    if (t > 1) t -= 1;
+                    if (t < 1/6) return p + (q - p) * 6 * t;
+                    if (t < 1/2) return q;
+                    if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
+                    return p;
+                };
+                
+                const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+                const p = 2 * l - q;
+                r = hue2rgb(p, q, h + 1/3);
+                g = hue2rgb(p, q, h);
+                b = hue2rgb(p, q, h - 1/3);
+            }
+            
+            return { r, g, b };
+        }
+        
+        // 创建粒子系统
+        createParticleSystem();
+        
+        // 获取文字元素并使其随爱心波动同步动画
+        const loveText = document.getElementById('love-text');
+        
+        // 爱心波动动画变量
+        let heartAnimationTime = 0;
+        const heartBaseScale = 1;
+        const heartPulseAmount = 0.1;
+        
+        // 动画循环
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            // 更新爱心波动动画
+            heartAnimationTime += 0.02;
+            const pulseScale = heartBaseScale + Math.sin(heartAnimationTime) * heartPulseAmount;
+            
+            // 更新蓝色爱心粒子的波动效果
+            const blueHeartPositions = blueHeartSystem.geometry.attributes.position.array;
+            for (let i = 0; i < blueHeartParticleCount; i++) {
+                const particle = blueHeartParticles[i];
+                const i3 = i * 3;
+                
+                // 为蓝色粒子添加波动效果
+                const localTime = heartAnimationTime + i * 0.001; // 每个粒子有轻微的时间偏移，使波动更自然
+                const waveOffset = Math.sin(localTime) * 0.02; // 波动幅度
+                
+                // 计算当前位置（基于原始位置和波动）
+                const newX = particle.originalPosition.x * pulseScale + (Math.random() - 0.5) * 0.005;
+                const newY = particle.originalPosition.y * pulseScale + (Math.random() - 0.5) * 0.005;
+                const newZ = particle.originalPosition.z * pulseScale + (Math.random() - 0.5) * 0.005;
+                
+                // 应用波动
+                const distFromCenter = Math.sqrt(newX*newX + newY*newY + newZ*newZ);
+                const pulseFactor = 1 + (waveOffset * (1 + distFromCenter));
+                
+                particle.position.set(
+                    newX * pulseFactor,
+                    newY * pulseFactor,
+                    newZ * pulseFactor
+                );
+                
+                // 更新几何体中的位置
+                blueHeartPositions[i3] = particle.position.x;
+                blueHeartPositions[i3 + 1] = particle.position.y;
+                blueHeartPositions[i3 + 2] = particle.position.z;
+            }
+            
+            // 通知Three.js蓝色爱心粒子位置属性已更新
+            blueHeartSystem.geometry.attributes.position.needsUpdate = true;
+            
+            // 更新相机旋转 - 缓慢围绕场景旋转
+            cameraRotationTime += 0.003; // 旋转速度
+            const cameraHeight = 1.2 + Math.sin(heartAnimationTime * 0.5) * 0.3; // 稍微降低相机高度
+            
+            // 使用极坐标计算相机新位置
+            camera.position.x = Math.cos(cameraRotationTime) * cameraRadius;
+            camera.position.y = cameraHeight;
+            camera.position.z = Math.sin(cameraRotationTime) * cameraRadius;
+            
+            // 确保相机始终看向场景中心
+            camera.lookAt(0, 0, 0);
+            
+            // 同步更新文字动画效果
+            const textScale = 1 + Math.sin(heartAnimationTime) * 0.03; // 文字缩放幅度
+            const textOpacity = 0.7 + Math.sin(heartAnimationTime) * 0.1; // 文字透明度变化
+            loveText.style.transform = `translate(-50%, -50%) scale(${textScale})`;
+            loveText.style.opacity = textOpacity;
+            
+            // 更新彩色粒子位置 - 让它们在爱心外部环绕
+            const positions = particleSystem.geometry.attributes.position.array;
+            
+            for (let i = 0; i < particleCount; i++) {
+                const particle = particles[i];
+                const i3 = i * 3;
+                
+                // 计算粒子到爱心中心的向量
+                const directionToHeart = new THREE.Vector3().subVectors(
+                    heart.position, // 爱心位置（原点）
+                    particle.position
+                );
+                
+                const distanceToHeart = directionToHeart.length();
+                
+                // 让彩色粒子在爱心外部环绕，修改引力逻辑
+                const minOrbitDistance = 1.0; // 最小环绕距离，确保粒子在爱心外部
+                const maxOrbitDistance = 3.0; // 最大环绕距离
+                
+                // 计算引力强度（基于距离）
+                let force = 0;
+                if (distanceToHeart < minOrbitDistance) {
+                    // 如果粒子靠近爱心，施加排斥力
+                    directionToHeart.normalize();
+                    force = -0.003 * (1 - distanceToHeart / minOrbitDistance);
+                    directionToHeart.multiplyScalar(force);
+                    particle.velocity.add(directionToHeart);
+                } else if (distanceToHeart > maxOrbitDistance) {
+                    // 如果粒子飞得太远，施加吸引力
+                    directionToHeart.normalize();
+                    force = 0.001 * (distanceToHeart / maxOrbitDistance);
+                    directionToHeart.multiplyScalar(force);
+                    particle.velocity.add(directionToHeart);
+                }
+                
+                // 添加环绕力，使粒子在爱心外部旋转
+                const orbitForce = new THREE.Vector3(
+                    -particle.position.z,  // 垂直于位置向量的力，产生环绕效果
+                    (Math.random() - 0.5) * 0.0001, // 轻微的上下运动
+                    particle.position.x
+                ).normalize().multiplyScalar(0.0005);
+                particle.velocity.add(orbitForce);
+                
+                // 限制粒子速度，防止过快
+                const maxSpeed = 0.03;
+                const currentSpeed = particle.velocity.lengthSq();
+                if (currentSpeed > maxSpeed * maxSpeed) {
+                    particle.velocity.normalize().multiplyScalar(maxSpeed);
+                }
+                
+                // 添加一些随机性，使粒子运动更自然
+                const randomFactor = 0.0008;
+                particle.velocity.add(new THREE.Vector3(
+                    (Math.random() - 0.5) * randomFactor,
+                    (Math.random() - 0.5) * randomFactor,
+                    (Math.random() - 0.5) * randomFactor
+                ));
+                
+                // 更新粒子位置
+                particle.position.add(particle.velocity);
+                
+                // 更新几何体中的位置
+                positions[i3] = particle.position.x;
+                positions[i3 + 1] = particle.position.y;
+                positions[i3 + 2] = particle.position.z;
+            }
+            
+            // 通知Three.js彩色粒子位置属性已更新
+            particleSystem.geometry.attributes.position.needsUpdate = true;
+            
+            // 渲染场景
+            renderer.render(scene, camera);
+        }
+        
+        // 开始动画
+        animate();
+    </script>
+</body>
+</html>
